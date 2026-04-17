@@ -17,7 +17,7 @@ export function ClientesFilter() {
   const debouncedSearch = useDebounce(search, 500)
 
   useEffect(() => {
-    handleFilterChange(initialStatus, debouncedSearch)
+    handleFilterChange(initialStatus, debouncedSearch || '')
   }, [debouncedSearch])
 
   const handleFilterChange = (status: string, q: string) => {
@@ -41,7 +41,7 @@ export function ClientesFilter() {
       <div className="w-full sm:w-[200px]">
         <Select 
           value={initialStatus} 
-          onValueChange={(val) => handleFilterChange(val, search)}
+          onValueChange={(val) => handleFilterChange(val, search || '')}
         >
           <SelectTrigger>
             <SelectValue placeholder="Filtrar por Status" />
