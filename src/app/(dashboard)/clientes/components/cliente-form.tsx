@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { saveCliente } from '../form-actions'
 import { toast } from 'sonner'
 import { Cliente, Assinatura } from '@/types'
-import { CheckCircle2, AlertCircle, Loader2, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 
 
 
@@ -67,42 +67,6 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
     rev = 11 - (add % 11)
     if (rev === 10 || rev === 11) rev = 0
     if (rev !== parseInt(cpf.charAt(10))) return false
-    return true
-  }
-
-  const checkCPF = async (cpfValue: string) => {
-    const cleanCpf = cpfValue.replace(/\D/g, '')
-    
-    if (cleanCpf.length === 11) {
-      if (!validateCPF(cleanCpf)) {
-        setCpfStatus({ status: 'error', message: 'CPF matematicamente inválido' })
-        return
-      }
-
-      setLoadingCpf(true)
-      setCpfStatus({ status: 'loading' })
-
-      try {
-        const res = await fetch(`/api/cpf/${cleanCpf}`)
-        const data = await res.json()
-
-        if (res.ok) {
-          setCpfStatus({ 
-            status: 'success', 
-            situacao: data.situacao,
-            message: `CPF ${data.situacao}` 
-          })
-          
-          // Auto-preenchimento
-          setPersonalData(prev => ({
-            ...prev,
-            nome_completo: data.nome_completo || prev.nome_completo,
-            data_nascimento: data.data_nascimento || prev.data_nascimento
-          }))
-
-          toast.success(`CPF encontrado: ${data.situacao}`)
-        } else {
-          setCpfStatus({ 
             status: res.status === 404 ? 'not_found' : 'error', 
             message: data.error || 'Erro ao consultar CPF' 
           })
@@ -180,40 +144,25 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="cpf">CPF</Label>
-                    <a 
-                      href="https://servicos.receita.fazenda.gov.br/servicos/cpf/consultasituacao/consultapublica.asp" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      title="Consulta Manual na Receita Federal"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                  {cpfStatus.status !== 'idle' && (
-                    <span className={`text-[10px] font-medium flex items-center gap-1 ${
-                      cpfStatus.status === 'success' ? (cpfStatus.situacao === 'REGULAR' ? 'text-green-600' : 'text-yellow-600') : 
-                      cpfStatus.status === 'error' ? 'text-red-600' : 
-                      cpfStatus.status === 'not_found' ? 'text-muted-foreground' : 'text-muted-foreground'
-                    }`}>
-                      {cpfStatus.status === 'loading' && <Loader2 className="h-2 w-2 animate-spin" />}
-                      {cpfStatus.status === 'success' && <CheckCircle2 className="h-2 w-2" />}
-                      {(cpfStatus.status === 'error' || cpfStatus.status === 'not_found') && <AlertCircle className="h-2 w-2" />}
-                      {cpfStatus.message || (cpfStatus.status === 'success' ? cpfStatus.situacao : '')}
-                    </span>
-                  )}
+                  <Label htmlFor="cpf">CPF</Label>
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    size="sm"
+                    className="h-7 text-[10px] gap-1 px-2 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => window.open('https://servicos.receita.fazenda.gov.br/servicos/cpf/consultasituacao/consultapublica.asp', '_blank')}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Receita Federal
+                  </Button>
                 </div>
                 <Input 
                   id="cpf" 
                   name="cpf" 
                   value={applyCpfMask(personalData.cpf)}
                   onChange={(e) => {
-                    const masked = applyCpfMask(e.target.value)
                     const clean = e.target.value.replace(/\D/g, '').slice(0, 11)
                     setPersonalData({...personalData, cpf: clean})
-                    if (clean.length === 11) checkCPF(clean)
                   }}
                   placeholder="000.000.000-00"
                 />
@@ -355,6 +304,5 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
         </Card>
       </div>
     </form>
-
   )
 }
