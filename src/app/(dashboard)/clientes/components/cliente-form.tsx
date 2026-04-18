@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { saveCliente } from '../form-actions'
 import { toast } from 'sonner'
 import { Cliente, Assinatura } from '@/types'
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+
 
 // Usando o Partial para quando nao estao preenchidos (modo criar)
 export default function ClienteForm({ initialData, isEdit = false }: { initialData?: Partial<Cliente & { assinatura: Partial<Assinatura> }>, isEdit?: boolean }) {
@@ -25,6 +27,84 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
     cidade: initialData?.cidade || '',
     estado: initialData?.estado || ''
   })
+
+  // Estados para o CPF
+  const [loadingCpf, setLoadingCpf] = useState(false)
+  const [cpfStatus, setCpfStatus] = useState<{
+    status: 'idle' | 'loading' | 'success' | 'error' | 'not_found',
+    message?: string,
+    situacao?: string
+  }>({ status: 'idle' })
+
+  const [personalData, setPersonalData] = useState({
+    nome_completo: initialData?.nome_completo || '',
+    data_nascimento: initialData?.data_nascimento || '',
+    cpf: initialData?.cpf || ''
+  })
+
+  const validateCPF = (cpf: string) => {
+    cpf = cpf.replace(/[^\d]+/g, '')
+    if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false
+    let add = 0
+    for (let i = 0; i < 9; i++) add += parseInt(cpf.charAt(i)) * (10 - i)
+    let rev = 11 - (add % 11)
+    if (rev === 10 || rev === 11) rev = 0
+    if (rev !== parseInt(cpf.charAt(9))) return false
+    add = 0
+    for (let i = 0; i < 10; i++) add += parseInt(cpf.charAt(i)) * (11 - i)
+    rev = 11 - (add % 11)
+    if (rev === 10 || rev === 11) rev = 0
+    if (rev !== parseInt(cpf.charAt(10))) return false
+    return true
+  }
+
+  const checkCPF = async (cpfValue: string) => {
+    const cleanCpf = cpfValue.replace(/\D/g, '')
+    
+    if (cleanCpf.length === 11) {
+      if (!validateCPF(cleanCpf)) {
+        setCpfStatus({ status: 'error', message: 'CPF matematicamente inválido' })
+        return
+      }
+
+      setLoadingCpf(true)
+      setCpfStatus({ status: 'loading' })
+
+      try {
+        const res = await fetch(`/api/cpf/${cleanCpf}`)
+        const data = await res.json()
+
+        if (res.ok) {
+          setCpfStatus({ 
+            status: 'success', 
+            situacao: data.situacao,
+            message: `CPF ${data.situacao}` 
+          })
+          
+          // Auto-preenchimento
+          setPersonalData(prev => ({
+            ...prev,
+            nome_completo: data.nome_completo || prev.nome_completo,
+            data_nascimento: data.data_nascimento || prev.data_nascimento
+          }))
+
+          toast.success(`CPF encontrado: ${data.situacao}`)
+        } else {
+          setCpfStatus({ 
+            status: res.status === 404 ? 'not_found' : 'error', 
+            message: data.error || 'Erro ao consultar CPF' 
+          })
+        }
+      } catch (err) {
+        setCpfStatus({ status: 'error', message: 'Erro na conexão com a API' })
+      } finally {
+        setLoadingCpf(false)
+      }
+    } else {
+      setCpfStatus({ status: 'idle' })
+    }
+  }
+
 
   const checkCEP = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const cep = e.target.value.replace(/\D/g, '')
@@ -75,18 +155,54 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="nome">Nome Completo</Label>
-            <Input id="nome" name="nome" defaultValue={initialData?.nome_completo} required />
+            <Input 
+              id="nome" 
+              name="nome" 
+              value={personalData.nome_completo} 
+              onChange={(e) => setPersonalData({...personalData, nome_completo: e.target.value})}
+              required 
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="cpf">CPF</Label>
-              <Input id="cpf" name="cpf" defaultValue={initialData?.cpf} />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cpf">CPF</Label>
+                {cpfStatus.status !== 'idle' && (
+                  <span className={`text-[10px] font-medium flex items-center gap-1 ${
+                    cpfStatus.status === 'success' ? (cpfStatus.situacao === 'REGULAR' ? 'text-green-600' : 'text-yellow-600') : 
+                    cpfStatus.status === 'error' ? 'text-red-600' : 'text-muted-foreground'
+                  }`}>
+                    {cpfStatus.status === 'loading' && <Loader2 className="h-2 w-2 animate-spin" />}
+                    {cpfStatus.status === 'success' && <CheckCircle2 className="h-2 w-2" />}
+                    {(cpfStatus.status === 'error' || cpfStatus.status === 'not_found') && <AlertCircle className="h-2 w-2" />}
+                    {cpfStatus.message || (cpfStatus.status === 'success' ? cpfStatus.situacao : '')}
+                  </span>
+                )}
+              </div>
+              <Input 
+                id="cpf" 
+                name="cpf" 
+                value={personalData.cpf}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 11)
+                  setPersonalData({...personalData, cpf: val})
+                  if (val.length === 11) checkCPF(val)
+                }}
+                placeholder="000.000.000-00"
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="data_nascimento">Data de Nascimento</Label>
-              <Input id="data_nascimento" name="data_nascimento" type="date" defaultValue={initialData?.data_nascimento} />
+              <Input 
+                id="data_nascimento" 
+                name="data_nascimento" 
+                type="date" 
+                value={personalData.data_nascimento} 
+                onChange={(e) => setPersonalData({...personalData, data_nascimento: e.target.value})}
+              />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="telefone">Telefone (Whatsapp)</Label>
