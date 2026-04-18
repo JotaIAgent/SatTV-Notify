@@ -67,18 +67,7 @@ export default function ClienteForm({ initialData, isEdit = false }: { initialDa
     rev = 11 - (add % 11)
     if (rev === 10 || rev === 11) rev = 0
     if (rev !== parseInt(cpf.charAt(10))) return false
-            status: res.status === 404 ? 'not_found' : 'error', 
-            message: data.error || 'Erro ao consultar CPF' 
-          })
-        }
-      } catch (err) {
-        setCpfStatus({ status: 'error', message: 'Erro na conexão com a API' })
-      } finally {
-        setLoadingCpf(false)
-      }
-    } else {
-      setCpfStatus({ status: 'idle' })
-    }
+    return true
   }
 
 
